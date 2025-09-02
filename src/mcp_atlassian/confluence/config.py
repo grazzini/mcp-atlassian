@@ -24,7 +24,7 @@ class ConfluenceConfig:
     """
 
     url: str  # Base URL for Confluence
-    auth_type: Literal["basic", "pat", "oauth"]  # Authentication type
+    auth_type: Literal["basic", "pat", "oauth", "pass_through"]  # Authentication type
     username: str | None = None  # Email or username
     api_token: str | None = None  # API token used as password
     personal_token: str | None = None  # Personal access token (Server/DC)
@@ -93,6 +93,9 @@ class ConfluenceConfig:
         # Use the shared utility function directly
         is_cloud = is_atlassian_cloud_url(url)
 
+        # Check for pass-through only mode
+        pass_through_only = os.getenv("ATLASSIAN_PASS_THROUGH_ONLY", "false").lower() == "true"
+        
         if oauth_config:
             # OAuth is available - could be full config or minimal config for user-provided tokens
             auth_type = "oauth"
@@ -102,11 +105,15 @@ class ConfluenceConfig:
         elif username and api_token:
             # Basic auth works for both Cloud and Server/Data Center
             auth_type = "basic"
+        elif pass_through_only:
+            # Pass-through only mode: no static credentials, all auth from HTTP headers
+            auth_type = "pass_through"
+            logger.info("Confluence configured for pass-through authentication only - all credentials must come from HTTP headers")
         else:
             if is_cloud:
-                error_msg = "Cloud authentication requires CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN, CONFLUENCE_PERSONAL_TOKEN, or OAuth configuration (set ATLASSIAN_OAUTH_ENABLE=true for user-provided tokens)"
+                error_msg = "Cloud authentication requires CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN, CONFLUENCE_PERSONAL_TOKEN, OAuth configuration, or ATLASSIAN_PASS_THROUGH_ONLY=true for header-based authentication"
             else:
-                error_msg = "Server/Data Center authentication requires CONFLUENCE_PERSONAL_TOKEN, CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN, or OAuth configuration"
+                error_msg = "Server/Data Center authentication requires CONFLUENCE_PERSONAL_TOKEN, CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN, OAuth configuration, or ATLASSIAN_PASS_THROUGH_ONLY=true for header-based authentication"
             raise ValueError(error_msg)
 
         # SSL verification (for Server/DC)
@@ -183,6 +190,10 @@ class ConfluenceConfig:
             return bool(self.personal_token)
         elif self.auth_type == "basic":
             return bool(self.username and self.api_token)
+        elif self.auth_type == "pass_through":
+            # Pass-through mode is always "configured" - auth comes from HTTP headers
+            logger.debug("Pass-through authentication mode - expecting credentials from HTTP headers")
+            return True
         logger.warning(
             f"Unknown or unsupported auth_type: {self.auth_type} in ConfluenceConfig"
         )
