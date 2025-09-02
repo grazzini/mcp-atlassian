@@ -96,21 +96,18 @@ class ConfluenceConfig:
         if oauth_config:
             # OAuth is available - could be full config or minimal config for user-provided tokens
             auth_type = "oauth"
-        elif is_cloud:
-            if username and api_token:
-                auth_type = "basic"
+        elif personal_token:
+            # PAT authentication works for both Cloud and Server/Data Center
+            auth_type = "pat"
+        elif username and api_token:
+            # Basic auth works for both Cloud and Server/Data Center
+            auth_type = "basic"
+        else:
+            if is_cloud:
+                error_msg = "Cloud authentication requires CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN, CONFLUENCE_PERSONAL_TOKEN, or OAuth configuration (set ATLASSIAN_OAUTH_ENABLE=true for user-provided tokens)"
             else:
-                error_msg = "Cloud authentication requires CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN, or OAuth configuration (set ATLASSIAN_OAUTH_ENABLE=true for user-provided tokens)"
-                raise ValueError(error_msg)
-        else:  # Server/Data Center
-            if personal_token:
-                auth_type = "pat"
-            elif username and api_token:
-                # Allow basic auth for Server/DC too
-                auth_type = "basic"
-            else:
-                error_msg = "Server/Data Center authentication requires CONFLUENCE_PERSONAL_TOKEN or CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN"
-                raise ValueError(error_msg)
+                error_msg = "Server/Data Center authentication requires CONFLUENCE_PERSONAL_TOKEN, CONFLUENCE_USERNAME and CONFLUENCE_API_TOKEN, or OAuth configuration"
+            raise ValueError(error_msg)
 
         # SSL verification (for Server/DC)
         ssl_verify = is_env_ssl_verify("CONFLUENCE_SSL_VERIFY")
