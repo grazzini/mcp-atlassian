@@ -2033,6 +2033,48 @@ async def create_issue_link(
 
 
 @jira_mcp.tool(
+    tags={"jira", "read", "toolset:jira_links"},
+    annotations={"title": "Get Remote Issue Links", "readOnlyHint": True},
+)
+async def get_remote_issue_links(
+    ctx: Context,
+    issue_key: Annotated[
+        str,
+        Field(
+            description="Jira issue key (e.g., 'PROJ-123', 'ACV2-642')",
+            pattern=ISSUE_KEY_PATTERN,
+        ),
+    ],
+) -> str:
+    """Get all remote issue links for a Jira issue.
+
+    Remote issue links are links to external resources such as
+    cross-instance Jira issues, Confluence pages, or arbitrary URLs.
+    These are distinct from standard issue links (which link issues
+    within the same Jira instance).
+
+    Use this to discover cross-instance links that are not returned
+    by the standard issuelinks field in jira_get_issue.
+
+    Args:
+        ctx: The FastMCP context.
+        issue_key: Jira issue key.
+
+    Returns:
+        JSON string representing a list of remote link objects.
+
+    Raises:
+        ValueError: If the Jira client is not configured or available.
+    """
+    jira = await get_jira_fetcher(ctx)
+    if not issue_key:
+        raise ValueError("issue_key is required.")
+
+    remote_links = jira.get_remote_issue_links(issue_key)
+    return json.dumps(remote_links, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(
     tags={"jira", "write", "toolset:jira_links"},
     annotations={"title": "Create Remote Issue Link", "destructiveHint": True},
 )
