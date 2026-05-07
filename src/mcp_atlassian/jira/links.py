@@ -117,6 +117,58 @@ class LinksMixin(JiraClient):
             raise Exception(f"Error creating issue link: {error_msg}") from e
 
     @handle_auth_errors("Jira API")
+    def get_remote_issue_links(
+        self, issue_key: str
+    ) -> list[dict[str, Any]]:
+        """
+        Get all remote issue links for a Jira issue.
+
+        Remote issue links are links to external resources such as
+        cross-instance Jira issues, Confluence pages, or arbitrary URLs.
+        These are distinct from standard issue links (which link issues
+        within the same Jira instance).
+
+        Args:
+            issue_key: The key of the issue (e.g., 'PROJ-123')
+
+        Returns:
+            List of remote link dictionaries from the Jira API
+
+        Raises:
+            ValueError: If issue_key is empty
+            MCPAtlassianAuthenticationError: If authentication fails
+                with the Jira API (401/403)
+            Exception: If there is an error retrieving remote links
+        """
+        if not issue_key:
+            raise ValueError("Issue key is required")
+
+        try:
+            if self.config.is_cloud:
+                endpoint = f"rest/api/3/issue/{issue_key}/remotelink"
+            else:
+                endpoint = f"rest/api/2/issue/{issue_key}/remotelink"
+            response = self.jira.get(endpoint)
+
+            if isinstance(response, list):
+                return response
+            if isinstance(response, dict):
+                return [response]
+            return []
+        except HTTPError:
+            raise
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(
+                f"Error getting remote issue links for {issue_key}: "
+                f"{error_msg}",
+                exc_info=True,
+            )
+            raise Exception(
+                f"Error getting remote issue links: {error_msg}"
+            ) from e
+
+    @handle_auth_errors("Jira API")
     def create_remote_issue_link(
         self, issue_key: str, link_data: dict[str, Any]
     ) -> dict[str, Any]:
